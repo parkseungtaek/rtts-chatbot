@@ -28,24 +28,29 @@ textarea{flex:1;resize:none;border:1px solid var(--line);background:var(--bg);co
 button.send{border:0;background:var(--red);color:#fff;border-radius:14px;padding:0 16px;font:inherit;font-weight:700;cursor:pointer}
 button.send:disabled{opacity:.5}
 .tools{display:flex;gap:6px;margin-left:auto}.tb{border:1px solid #ffffff55;background:transparent;color:#fff;border-radius:10px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer}
-#pf{display:none;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line)}#pf textarea{width:100%}#pf small{color:var(--mute)}
+#pf{display:none;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line)}#pg{display:grid;grid-template-columns:1fr 1fr;gap:6px}#pg label{font-size:12px;color:var(--mute);display:flex;flex-direction:column;gap:2px}#pg input,#pg select{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;width:100%}.fb{margin-top:6px;font-size:12px;color:var(--mute)}.fb button{border:1px solid var(--line);background:transparent;border-radius:8px;padding:2px 8px;margin-right:6px;cursor:pointer}#pf small{color:var(--mute)}
 .pv{font-size:12px;color:var(--mute);padding:0 14px}.cam{border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:0 11px;font-size:18px;cursor:pointer}
 .note{font-size:12px;color:var(--mute);text-align:center;padding:0 10px 6px}
 </style>
 </head>
 <body>
 <header><span class="logo">⚾</span><div><b>더쇼 26 RTTS 박사</b><small>Road to the Show 뉴비 전용 코치</small></div><div class="tools"><button class="tb" id="pb" type="button">내 선수</button><button class="tb" id="nb" type="button">새 대화</button></div></header>
-<div id="pf"><textarea id="pt" rows="4" placeholder="예) 선발투수(SP), 더블A, OVR 62, 직구·슬라이더·체인지업, 난이도 베테랑, Pinpoint 사용. 구속 70 / 제구 55 / 클러치 40, 고민: 4회만 되면 털림"></textarea><small>입력하면 이 브라우저에 저장되고, 모든 질문에 함께 전달돼요.</small></div>
+<div id="pf"><div id="pg"></div><small>입력하면 이 브라우저에 저장되고, 모든 질문에 함께 전달돼요.</small></div>
 <div id="chat" aria-live="polite"></div>
 <div class="pv" id="pv"></div>
 <div class="note">AI 코치라 틀릴 수 있어요. 중요한 수치는 게임 내 설명과 함께 확인하세요.</div>
 <form id="f"><button class="cam" id="cb" type="button" title="스크린샷 첨부">📷</button><input id="fi" type="file" accept="image/*" hidden><textarea id="q" rows="1" placeholder="RTTS에 대해 뭐든 물어보세요"></textarea><button class="send" id="b">전송</button></form>
 <script>
-const chat=document.getElementById('chat'),q=document.getElementById('q'),btn=document.getElementById('b'),pt=document.getElementById('pt'),pv=document.getElementById('pv'),fi=document.getElementById('fi');
+const chat=document.getElementById('chat'),q=document.getElementById('q'),btn=document.getElementById('b'),pv=document.getElementById('pv'),fi=document.getElementById('fi');
 const ls={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}}};
 let hist=[],busy=false,img=null;
 try{hist=JSON.parse(ls.get('rtts_h')||'[]')}catch{}
-pt.value=ls.get('rtts_p')||'';pt.addEventListener('input',()=>ls.set('rtts_p',pt.value));
+const F=[['pos','포지션','s',['선발투수(SP)','불펜(RP)','마무리','포수','1루수','2루수','3루수','유격수','좌익수','중견수','우익수']],['lv','현재 레벨','s',['고교','대학','더블A','트리플A','메이저']],['ui','조작 방식','s',['Pinpoint','Pure Analog','Meter','Pulse','Classic']],['df','난이도','t'],['ovr','OVR','t'],['at','능력치','t'],['pi','구종','t'],['pk','퍼크','t'],['wr','현재 고민','t']];
+let P={};try{P=JSON.parse(ls.get('rtts_p2')||'{}')}catch{}
+F.forEach(([k,l,t,o])=>{const w=document.createElement('label');w.textContent=l;const e=document.createElement(t==='s'?'select':'input');if(t==='s')e.innerHTML='<option value="">선택</option>'+o.map(x=>'<option>'+x+'</option>').join('');else if(k==='at')e.placeholder='예) 구속70 제구55 클러치40 스태미나60';e.value=P[k]||'';e.onchange=e.oninput=()=>{P[k]=e.value;ls.set('rtts_p2',JSON.stringify(P))};w.appendChild(e);document.getElementById('pg').appendChild(w)});
+const prof=()=>F.filter(f=>P[f[0]]).map(f=>f[1]+': '+P[f[0]]).join('\n');
+function fb(el,q,a){const d=document.createElement('div');d.className='fb';['👍','👎'].forEach((v,i)=>{const b=document.createElement('button');b.textContent=v;b.onclick=()=>{let note='';if(i)note=prompt('뭐가 틀렸거나 아쉬웠나요? (선택)')||'';d.textContent=i?'피드백 고마워요. 개선에 반영할게요.':'고마워요!';fetch('/.netlify/functions/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vote:i?'down':'up',q,a,note,profile:prof()})}).catch(()=>{})};d.appendChild(b)});el.appendChild(d)}
+
 document.getElementById('pb').onclick=()=>{const p=document.getElementById('pf');p.style.display=p.style.display==='block'?'none':'block'};
 document.getElementById('nb').onclick=()=>{if(busy)return;hist=[];ls.set('rtts_h','[]');chat.innerHTML='';intro()};
 document.getElementById('cb').onclick=()=>fi.click();
@@ -67,7 +72,7 @@ add('me',img?'📷 '+text:text,true);hist.push({role:'user',content:text});
 const out=add('bot','<p>생각 중…</p>');let acc='';
 try{const msgs=hist.slice(-20).map(m=>({...m}));
 if(img){msgs[msgs.length-1].content=[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}},{type:'text',text}];img=null;pv.textContent=''}
-const res=await fetch('/.netlify/functions/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:msgs,profile:pt.value})});
+const res=await fetch('/.netlify/functions/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:msgs,profile:prof()})});
 if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'오류')}
 const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
 for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop();
@@ -76,7 +81,7 @@ if(ev.type==='content_block_start'&&ev.content_block?.type==='server_tool_use'){
 else if(ev.type==='content_block_delta'&&ev.delta?.type==='text_delta'){acc+=ev.delta.text;out.innerHTML=md(acc)}
 chat.scrollTop=chat.scrollHeight}}
 if(!acc.trim())throw new Error('빈 답변');
-hist.push({role:'assistant',content:acc});ls.set('rtts_h',JSON.stringify(hist.slice(-30)))}
+hist.push({role:'assistant',content:acc});ls.set('rtts_h',JSON.stringify(hist.slice(-30)));fb(out,text,acc)}
 catch(e){out.innerHTML=(acc?md(acc):'')+'<p>⚠️ '+esc(e.message||'답변을 가져오지 못했어요')+'</p>';if(!acc)hist.pop()}
 finally{busy=false;btn.disabled=false;chat.scrollTop=chat.scrollHeight}}
 document.getElementById('f').addEventListener('submit',e=>{e.preventDefault();send(q.value)});

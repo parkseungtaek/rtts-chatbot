@@ -27,40 +27,61 @@ form{display:flex;gap:8px;padding:10px 12px;background:var(--card);border-top:1p
 textarea{flex:1;resize:none;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:14px;padding:9px 12px;font:inherit;max-height:110px}
 button.send{border:0;background:var(--red);color:#fff;border-radius:14px;padding:0 16px;font:inherit;font-weight:700;cursor:pointer}
 button.send:disabled{opacity:.5}
+.tools{display:flex;gap:6px;margin-left:auto}.tb{border:1px solid #ffffff55;background:transparent;color:#fff;border-radius:10px;padding:5px 9px;font:inherit;font-size:12px;cursor:pointer}
+#pf{display:none;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line)}#pf textarea{width:100%}#pf small{color:var(--mute)}
+.pv{font-size:12px;color:var(--mute);padding:0 14px}.cam{border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:0 11px;font-size:18px;cursor:pointer}
 .note{font-size:12px;color:var(--mute);text-align:center;padding:0 10px 6px}
 </style>
 </head>
 <body>
-<header><span class="logo">⚾</span><div><b>더쇼 26 RTTS 박사</b><small>Road to the Show 뉴비 전용 코치</small></div></header>
+<header><span class="logo">⚾</span><div><b>더쇼 26 RTTS 박사</b><small>Road to the Show 뉴비 전용 코치</small></div><div class="tools"><button class="tb" id="pb" type="button">내 선수</button><button class="tb" id="nb" type="button">새 대화</button></div></header>
+<div id="pf"><textarea id="pt" rows="4" placeholder="예) 선발투수(SP), 더블A, OVR 62, 직구·슬라이더·체인지업, 난이도 베테랑, Pinpoint 사용. 구속 70 / 제구 55 / 클러치 40, 고민: 4회만 되면 털림"></textarea><small>입력하면 이 브라우저에 저장되고, 모든 질문에 함께 전달돼요.</small></div>
 <div id="chat" aria-live="polite"></div>
-<div class="note">AI 코치라 패치로 바뀐 내용은 틀릴 수 있어요. 게임 내 설명과 함께 확인하세요.</div>
-<form id="f"><textarea id="q" rows="1" placeholder="RTTS에 대해 뭐든 물어보세요"></textarea><button class="send" id="b">전송</button></form>
+<div class="pv" id="pv"></div>
+<div class="note">AI 코치라 틀릴 수 있어요. 중요한 수치는 게임 내 설명과 함께 확인하세요.</div>
+<form id="f"><button class="cam" id="cb" type="button" title="스크린샷 첨부">📷</button><input id="fi" type="file" accept="image/*" hidden><textarea id="q" rows="1" placeholder="RTTS에 대해 뭐든 물어보세요"></textarea><button class="send" id="b">전송</button></form>
 <script>
-const chat=document.getElementById('chat'),q=document.getElementById('q'),btn=document.getElementById('b');
-let hist=[],busy=false;
+const chat=document.getElementById('chat'),q=document.getElementById('q'),btn=document.getElementById('b'),pt=document.getElementById('pt'),pv=document.getElementById('pv'),fi=document.getElementById('fi');
+const ls={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}}};
+let hist=[],busy=false,img=null;
+try{hist=JSON.parse(ls.get('rtts_h')||'[]')}catch{}
+pt.value=ls.get('rtts_p')||'';pt.addEventListener('input',()=>ls.set('rtts_p',pt.value));
+document.getElementById('pb').onclick=()=>{const p=document.getElementById('pf');p.style.display=p.style.display==='block'?'none':'block'};
+document.getElementById('nb').onclick=()=>{if(busy)return;hist=[];ls.set('rtts_h','[]');chat.innerHTML='';intro()};
+document.getElementById('cb').onclick=()=>fi.click();
+fi.onchange=async()=>{const f=fi.files[0];fi.value='';if(!f)return;img=await shrink(f);pv.innerHTML='📷 스크린샷 첨부됨 <a href="#" id="rm">취소</a>';document.getElementById('rm').onclick=e=>{e.preventDefault();img=null;pv.textContent=''}};
+function shrink(f){return new Promise(r=>{const i=new Image();i.onload=()=>{const s=Math.min(1,1280/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.8).split(',')[1])};i.src=URL.createObjectURL(f)})}
 const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function md(t){let h='',l=null;const close=()=>{if(l){h+='</'+l+'>';l=null}};
-for(const raw of t.split('\n')){const s=esc(raw).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
-let m;if(m=s.match(/^\s*[-*•]\s+(.*)/)){if(l!=='ul'){close();h+='<ul>';l='ul'}h+='<li>'+m[1]+'</li>'}
+for(const raw of t.split('\n')){const s=esc(raw).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');let m;
+if(m=s.match(/^\s*[-*•]\s+(.*)/)){if(l!=='ul'){close();h+='<ul>';l='ul'}h+='<li>'+m[1]+'</li>'}
 else if(m=s.match(/^\s*\d+[.)]\s+(.*)/)){if(l!=='ol'){close();h+='<ol>';l='ol'}h+='<li>'+m[1]+'</li>'}
 else{close();if(s.trim())h+='<p>'+s.replace(/^#+\s*/,'')+'</p>'}}
 close();return h}
 function add(cls,html,isText){const d=document.createElement('div');d.className='m '+cls;if(isText)d.textContent=html;else d.innerHTML=html;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d}
-const CHIPS=['처음 RTTS 만들 때 뭐부터 세팅해야 해?','선발투수 능력치·구종 추천해줘','투구 조작 방식 Pinpoint/Classic/Pulse 뭐가 좋아?','대학 갈까 바로 드래프트 갈까?','콜업 빠르게 되는 방법 알려줘','Bear Down Pitching이 뭐야?','퍼크는 뭘 먼저 사?','등판하면 자꾸 털려… 원인이 뭐야?'];
-function intro(){add('bot','<p>안녕하세요! 저는 <b>RTTS 박사</b>예요 ⚾ 더쇼 26 Road to the Show에 관한 건 뭐든 물어보세요. 아래 질문으로 시작해도 좋아요.</p>');
+const CHIPS=['처음 RTTS 만들 때 뭐부터 세팅해야 해?','선발투수 능력치·구종 추천해줘','투구 조작 방식 Pinpoint/Classic/Pulse 뭐가 좋아?','대학 갈까 바로 드래프트 갈까?','Bear Down Pitching이 뭐야?','퍼크는 뭘 먼저 사?','등판하면 자꾸 털려… 원인이 뭐야?','이번 패치에서 RTTS 바뀐 점 알려줘'];
+function intro(){add('bot','<p>안녕하세요! 저는 <b>RTTS 박사</b>예요 ⚾ 필요하면 최신 정보를 검색해서 답하고, 위의 <b>내 선수</b>에 정보를 적거나 📷로 스크린샷을 보내면 내 상황에 맞춰 알려드려요.</p>');
 const c=document.createElement('div');c.className='chips';CHIPS.forEach(t=>{const b=document.createElement('button');b.className='chip';b.type='button';b.textContent=t;b.onclick=()=>{c.remove();send(t)};c.appendChild(b)});chat.appendChild(c)}
 async function send(text){text=text.trim();if(!text||busy)return;busy=true;btn.disabled=true;q.value='';
-add('me',text,true);hist.push({role:'user',content:text});
-const out=add('bot','<p>생각 중…</p>');
-try{const msgs=hist.slice(-12);while(msgs.length&&msgs[0].role!=='user')msgs.shift();
-const res=await fetch('/.netlify/functions/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:msgs})});
-const r=await res.json();if(!res.ok)throw r;
-out.innerHTML=md(r.text);hist.push({role:'assistant',content:r.text})}
-catch(e){out.innerHTML='<p>답변을 가져오지 못했어요'+('')+'. 다시 보내주세요.</p>';hist.pop()}
+add('me',img?'📷 '+text:text,true);hist.push({role:'user',content:text});
+const out=add('bot','<p>생각 중…</p>');let acc='';
+try{const msgs=hist.slice(-20).map(m=>({...m}));
+if(img){msgs[msgs.length-1].content=[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:img}},{type:'text',text}];img=null;pv.textContent=''}
+const res=await fetch('/.netlify/functions/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:msgs,profile:pt.value})});
+if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'오류')}
+const rd=res.body.getReader(),dec=new TextDecoder();let buf='';
+for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop();
+for(const ln of lines){if(!ln.startsWith('data:'))continue;let ev;try{ev=JSON.parse(ln.slice(5))}catch{continue}
+if(ev.type==='content_block_start'&&ev.content_block?.type==='server_tool_use'){out.innerHTML=md(acc)+'<p>🔎 최신 정보 검색 중…</p>'}
+else if(ev.type==='content_block_delta'&&ev.delta?.type==='text_delta'){acc+=ev.delta.text;out.innerHTML=md(acc)}
+chat.scrollTop=chat.scrollHeight}}
+if(!acc.trim())throw new Error('빈 답변');
+hist.push({role:'assistant',content:acc});ls.set('rtts_h',JSON.stringify(hist.slice(-30)))}
+catch(e){out.innerHTML=(acc?md(acc):'')+'<p>⚠️ '+esc(e.message||'답변을 가져오지 못했어요')+'</p>';if(!acc)hist.pop()}
 finally{busy=false;btn.disabled=false;chat.scrollTop=chat.scrollHeight}}
 document.getElementById('f').addEventListener('submit',e=>{e.preventDefault();send(q.value)});
 q.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send(q.value)}});
-intro();
+if(hist.length){hist.forEach(m=>m.role==='user'?add('me',m.content,true):add('bot',md(m.content)))}else intro();
 </script>
 </body>
 </html>
